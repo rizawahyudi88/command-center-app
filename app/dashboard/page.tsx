@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Loader2, CheckCircle, ExternalLink, Clock, File, Sparkles, ChevronDown, LogOut, User, Save } from 'lucide-react';
+import { FileText, Loader2, CheckCircle, ExternalLink, Clock, File, Sparkles, ChevronDown, LogOut, User, Save, ShieldCheck, XCircle, AlertCircle } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -13,16 +13,21 @@ export default function DocumentGeneratorPage() {
     const router = useRouter();
     const [checkingAuth, setCheckingAuth] = useState(true);
 
-    // STATE BARU: Manajemen Profil Personel
+    // State Profil & Role
     const [profile, setProfile] = useState<any>(null);
     const [savingProfile, setSavingProfile] = useState(false);
 
+    // State Generator & Riwayat
     const [loading, setLoading] = useState(false);
     const [generatingAI, setGeneratingAI] = useState(false);
     const [successData, setSuccessData] = useState<any>(null);
     const [history, setHistory] = useState<any[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [templateType, setTemplateType] = useState('LHK');
+
+    // STATE BARU: Antrean Persetujuan (Khusus Admin/Pimpinan)
+    const [approvalQueue, setApprovalQueue] = useState<any[]>([]);
+    const [loadingApproval, setLoadingApproval] = useState(false);
 
     const [formData, setFormData] = useState({
         nomor_surat: 'B/ND-001/V/OPS/2026',
@@ -38,14 +43,19 @@ export default function DocumentGeneratorPage() {
             if (!session) {
                 router.push('/login');
             } else {
-                // Ambil data profil dari database berdasarkan ID sesi
                 const { data: profileData } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', session.user.id)
                     .single();
 
-                if (profileData) setProfile(profileData);
+                if (profileData) {
+                    setProfile(profileData);
+                    // Jika role adalah ADMIN atau PIMPINAN, muat antrean persetujuan
+                    if (profileData.role === 'ADMIN' || profileData.role === 'PIMPINAN') {
+                        fetchApprovalQueue();
+                    }
+                }
 
                 setCheckingAuth(false);
                 fetchHistory();
@@ -67,13 +77,44 @@ export default function DocumentGeneratorPage() {
         setLoadingHistory(false);
     };
 
+    // FUNGSI BARU: Mengambil Dokumen yang Menunggu Persetujuan
+    const fetchApprovalQueue = async () => {
+        setLoadingApproval(true);
+        const { data, error } = await supabase
+            .from('documents')
+            .select('*, profiles(email, nama_lengkap)')
+            .eq('status', 'WAITING_APPROVAL')
+            .order('created_at', { ascending: true });
+
+        if (data) setApprovalQueue(data);
+        if (error) console.error('Gagal mengambil antrean persetujuan:', error);
+        setLoadingApproval(false);
+    };
+
+    // FUNGSI BARU: Aksi Persetujuan Dokumen (ACC)
+    const handleUpdateStatus = async (docId: string, newStatus: 'APPROVED' | 'REVISED') => {
+        try {
+            const { error } = await supabase
+                .from('documents')
+                .update({ status: newStatus })
+                .eq('id', docId);
+
+            if (error) throw error;
+
+            // Refresh data antrean dan riwayat setelah aksi berhasil
+            fetchApprovalQueue();
+            fetchHistory();
+        } catch (error: any) {
+            alert('Gagal memperbarui status dokumen: ' + error.message);
+        }
+    };
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
         document.cookie = "cc_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         router.push('/login');
     };
 
-    // FUNGSI BARU: Simpan Pembaruan Profil
     const handleSaveProfile = async () => {
         setSavingProfile(true);
         try {
@@ -118,7 +159,7 @@ export default function DocumentGeneratorPage() {
             }
         } catch (error) {
             alert('Terjadi kesalahan koneksi ke server AI Google.');
-        } finally {
+        } final {
             setGeneratingAI(false);
         }
     };
@@ -134,7 +175,7 @@ export default function DocumentGeneratorPage() {
                 body: JSON.stringify({
                     template_type: templateType,
                     variables: formData,
-                    user_id: profile.id // <-- TAMBAHKAN BARIS INI
+                    user_id: profile.id
                 })
             });
             const result = await response.json();
@@ -142,6 +183,9 @@ export default function DocumentGeneratorPage() {
                 setSuccessData(result);
                 setFormData({ ...formData, isi_narasi: '' });
                 fetchHistory();
+                if (profile.role === 'ADMIN' || profile.role === 'PIMPINAN') {
+                    fetchApprovalQueue();
+                }
             } else {
                 alert('Gagal: ' + result.error);
             }
@@ -171,7 +215,6 @@ export default function DocumentGeneratorPage() {
                         <p className="text-sm text-slate-400 mt-1">Sistem Otomatisasi Dokumen & Cloud Sinkronisasi</p>
                     </div>
                     <div className="flex items-center gap-4">
-                        {/* BADGE ROLE DARI DATABASE */}
                         {profile && (
                             <div className="px-3 py-1 bg-slate-900 border border-slate-700 rounded-sm text-[10px] font-bold tracking-widest uppercase text-slate-300">
                                 Akses: <span className="text-emerald-400">{profile.role}</span>
@@ -186,16 +229,61 @@ export default function DocumentGeneratorPage() {
                     </div>
                 </div>
 
+                {/* PANEL BARU: DINAMIS APPROVAL QUEUE (Hanya muncul jika ADMIN/PIMPINAN) */}
+                {(profile?.role === 'ADMIN' || profile?.role === 'PIMPINAN') && (
+                    <div className="bg-slate-900 border border-amber-500/30 bg-amber-950/5 p-6 rounded-sm shadow-2xl space-y-4">
+                        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+                            <ShieldCheck className="w-5 h-5 text-amber-400" />
+                            <div>
+                                <h2 className="text-sm font-bold tracking-wider uppercase text-amber-400">Antrean Persetujuan Dokumen</h2>
+                                <p className="text-[11px] text-slate-400">Daftar naskah dinas masuk yang memerlukan verifikasi pimpinan</p>
+                            </div>
+                        </div>
+
+                        {loadingApproval ? (
+                            <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 text-amber-500 animate-spin" /></div>
+                        ) : approvalQueue.length === 0 ? (
+                            <p className="text-xs text-slate-500 py-2">Tidak ada naskah dinas yang memerlukan persetujuan saat ini.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {approvalQueue.map((doc) => (
+                                    <div key={doc.id} className="p-4 bg-slate-950 border border-slate-800 rounded-sm flex flex-col justify-between space-y-3">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className="text-[9px] font-bold bg-blue-900/20 text-blue-400 border border-blue-800/30 px-1.5 py-0.5 rounded-sm uppercase tracking-wider">{doc.jenis_naskah}</span>
+                                                <span className="text-[9px] text-slate-500">{new Date(doc.created_at).toLocaleDateString('id-ID')}</span>
+                                            </div>
+                                            <h4 className="text-xs font-bold text-slate-200 truncate">{doc.title.replace('.pdf', '')}</h4>
+                                            <p className="text-[10px] text-slate-400 mt-1">Oleh: {doc.profiles?.nama_lengkap || doc.profiles?.email || 'Eksternal'}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 border-t border-slate-900 pt-2">
+                                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-[10px] bg-slate-900 hover:bg-slate-800 border border-slate-700 px-2 py-1.5 rounded-sm font-bold tracking-wider uppercase flex items-center gap-1 transition-colors">
+                                                <ExternalLink className="w-3 h-3" /> Reviu PDF
+                                            </a>
+                                            <button onClick={() => handleUpdateStatus(doc.id, 'APPROVED')} className="ml-auto text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1.5 rounded-sm font-bold tracking-wider uppercase flex items-center gap-1 transition-colors">
+                                                <ShieldCheck className="w-3 h-3" /> ACC
+                                            </button>
+                                            <button onClick={() => handleUpdateStatus(doc.id, 'REVISED')} className="text-[10px] bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-800/50 px-2 py-1.5 rounded-sm font-bold tracking-wider uppercase flex items-center gap-1 transition-colors">
+                                                <XCircle className="w-3 h-3" /> Tolak
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                    {/* KOLOM KIRI: FORM GENERATOR */}
+                    {/* FORM GENERATOR */}
                     <div className="lg:col-span-2 space-y-6">
                         {successData && (
                             <div className="p-5 border border-emerald-500 bg-emerald-900/20 rounded-sm flex items-start gap-4">
                                 <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
                                 <div>
                                     <h3 className="font-bold text-emerald-400 tracking-widest text-xs uppercase mb-1">Injeksi Cloud Berhasil</h3>
-                                    <p className="text-sm text-slate-300 mb-3">Dokumen {templateType} telah diamankan di pangkalan data.</p>
+                                    <p className="text-sm text-slate-300 mb-3">Dokumen {templateType} telah diajukan ke antrean persetujuan.</p>
                                     <a href={successData.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-slate-900 border border-slate-700 px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors">
                                         <ExternalLink className="w-4 h-4" /> Buka Arsip
                                     </a>
@@ -245,16 +333,14 @@ export default function DocumentGeneratorPage() {
                                 </div>
 
                                 <button type="submit" disabled={loading || generatingAI} className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900 text-white text-xs font-bold py-4 rounded-sm tracking-widest uppercase transition-colors flex items-center justify-center gap-2">
-                                    {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Memproses Dokumen & Cloud...</> : <><FileText className="w-4 h-4" /> Eksekusi Naskah Dinas</>}
+                                    {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Memproses Dokumen & Cloud...</> : <><FileText className="w-4 h-4" /> Ajukan Naskah Dinas</>}
                                 </button>
                             </form>
                         </div>
                     </div>
 
-                    {/* KOLOM KANAN: PROFIL & AUDIT TRAIL */}
+                    {/* KOLOM KANAN */}
                     <div className="lg:col-span-1 space-y-6">
-
-                        {/* PANEL PROFIL PERSONEL */}
                         {profile && (
                             <div className="bg-slate-900 border border-slate-800 p-5 rounded-sm shadow-2xl">
                                 <div className="flex items-center gap-2 mb-5 border-b border-slate-800 pb-3">
@@ -264,29 +350,13 @@ export default function DocumentGeneratorPage() {
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Nama Sesuai Naskah</label>
-                                        <input
-                                            type="text"
-                                            value={profile.nama_lengkap || ''}
-                                            onChange={(e) => setProfile({ ...profile, nama_lengkap: e.target.value })}
-                                            placeholder="Contoh: Budi Santoso"
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-blue-500 text-slate-200"
-                                        />
+                                        <input type="text" value={profile.nama_lengkap || ''} onChange={(e) => setProfile({ ...profile, nama_lengkap: e.target.value })} placeholder="Contoh: Budi Santoso" className="w-full bg-slate-950 border border-slate-800 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-blue-500 text-slate-200" />
                                     </div>
                                     <div>
                                         <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Identitas Pangkat/NRP</label>
-                                        <input
-                                            type="text"
-                                            value={profile.pangkat_nrp || ''}
-                                            onChange={(e) => setProfile({ ...profile, pangkat_nrp: e.target.value })}
-                                            placeholder="Contoh: 88050123"
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-blue-500 text-slate-200"
-                                        />
+                                        <input type="text" value={profile.pangkat_nrp || ''} onChange={(e) => setProfile({ ...profile, pangkat_nrp: e.target.value })} placeholder="Contoh: 88050123" className="w-full bg-slate-950 border border-slate-800 rounded-sm px-3 py-2 text-xs focus:outline-none focus:border-blue-500 text-slate-200" />
                                     </div>
-                                    <button
-                                        onClick={handleSaveProfile}
-                                        disabled={savingProfile}
-                                        className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold py-2.5 rounded-sm tracking-widest uppercase transition-colors flex items-center justify-center gap-2"
-                                    >
+                                    <button onClick={handleSaveProfile} disabled={savingProfile} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold py-2.5 rounded-sm tracking-widest uppercase transition-colors flex items-center justify-center gap-2">
                                         {savingProfile ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                                         Simpan Identitas
                                     </button>
@@ -309,12 +379,21 @@ export default function DocumentGeneratorPage() {
                                     {history.map((doc) => (
                                         <div key={doc.id} className="group flex flex-col p-3 border border-slate-800 bg-slate-950 hover:border-slate-600 transition-colors rounded-sm">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400">{doc.jenis_naskah}</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400">{doc.jenis_naskah}</span>
+                                                    {/* INDIKATOR STATUS DOKUMEN */}
+                                                    <span className={`text-[8px] px-1 py-0.5 rounded-sm font-semibold tracking-wider ${doc.status === 'APPROVED' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/40' :
+                                                            doc.status === 'REVISED' ? 'bg-red-900/30 text-red-400 border border-red-800/40' :
+                                                                'bg-amber-900/30 text-amber-400 border border-amber-800/40'
+                                                        }`}>
+                                                        {doc.status}
+                                                    </span>
+                                                </div>
                                                 <span className="text-[9px] text-slate-500">{new Date(doc.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</span>
                                             </div>
-                                            <p className="text-xs font-medium text-slate-300 truncate mb-3" title={doc.title}>{doc.title.replace('.docx', '')}</p>
+                                            <p className="text-xs font-medium text-slate-300 truncate mb-3" title={doc.title}>{doc.title.replace('.pdf', '')}</p>
                                             <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="mt-auto text-[10px] font-bold text-slate-500 group-hover:text-slate-300 uppercase tracking-widest flex items-center gap-1 transition-colors">
-                                                <File className="w-3 h-3" /> Buka
+                                                <File className="w-3 h-3" /> Buka PDF
                                             </a>
                                         </div>
                                     ))}
