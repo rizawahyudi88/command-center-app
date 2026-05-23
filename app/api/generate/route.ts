@@ -61,7 +61,7 @@ export async function POST(request: Request) {
                 mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 body: require('stream').Readable.from(docBuffer),
             },
-            fields: 'id, WebViewLink',
+            fields: 'id, webViewLink',
         });
 
         const googleDocId = driveResponse.data.id;
