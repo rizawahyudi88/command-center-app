@@ -159,7 +159,7 @@ export default function DocumentGeneratorPage() {
             }
         } catch (error) {
             alert('Terjadi kesalahan koneksi ke server AI Google.');
-        } final {
+        } finally {
             setGeneratingAI(false);
         }
     };
@@ -383,8 +383,8 @@ export default function DocumentGeneratorPage() {
                                                     <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400">{doc.jenis_naskah}</span>
                                                     {/* INDIKATOR STATUS DOKUMEN */}
                                                     <span className={`text-[8px] px-1 py-0.5 rounded-sm font-semibold tracking-wider ${doc.status === 'APPROVED' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/40' :
-                                                            doc.status === 'REVISED' ? 'bg-red-900/30 text-red-400 border border-red-800/40' :
-                                                                'bg-amber-900/30 text-amber-400 border border-amber-800/40'
+                                                        doc.status === 'REVISED' ? 'bg-red-900/30 text-red-400 border border-red-800/40' :
+                                                            'bg-amber-900/30 text-amber-400 border border-amber-800/40'
                                                         }`}>
                                                         {doc.status}
                                                     </span>
