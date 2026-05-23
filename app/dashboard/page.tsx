@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Loader2, CheckCircle, ExternalLink, Clock, File, Sparkles } from 'lucide-react';
+import { FileText, Loader2, CheckCircle, ExternalLink, Clock, File, Sparkles, ChevronDown } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-// Inisialisasi Klien Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -15,6 +14,9 @@ export default function DocumentGeneratorPage() {
     const [successData, setSuccessData] = useState<any>(null);
     const [history, setHistory] = useState<any[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
+
+    // STATE BARU: Menyimpan jenis naskah yang dipilih
+    const [templateType, setTemplateType] = useState('LHK');
 
     const [formData, setFormData] = useState({
         nomor_surat: 'B/ND-001/V/OPS/2026',
@@ -83,7 +85,7 @@ export default function DocumentGeneratorPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    template_type: 'LHK',
+                    template_type: templateType, // Menggunakan state dropdown
                     variables: formData
                 })
             });
@@ -109,7 +111,6 @@ export default function DocumentGeneratorPage() {
         <div className="min-h-screen bg-slate-950 text-slate-50 font-sans p-8">
             <div className="max-w-4xl mx-auto space-y-8">
 
-                {/* HEADER */}
                 <div className="border-b border-slate-800 pb-4 flex justify-between items-end">
                     <div>
                         <h1 className="text-2xl font-bold tracking-wider">GENERATOR NASKAH DINAS</h1>
@@ -122,14 +123,13 @@ export default function DocumentGeneratorPage() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                    {/* KOLOM KIRI: FORM GENERATOR */}
                     <div className="lg:col-span-2 space-y-6">
                         {successData && (
                             <div className="p-5 border border-emerald-500 bg-emerald-900/20 rounded-sm flex items-start gap-4">
                                 <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
                                 <div>
                                     <h3 className="font-bold text-emerald-400 tracking-widest text-xs uppercase mb-1">Injeksi Cloud Berhasil</h3>
-                                    <p className="text-sm text-slate-300 mb-3">Dokumen telah dicetak dan diamankan di pangkalan data.</p>
+                                    <p className="text-sm text-slate-300 mb-3">Dokumen {templateType} telah dicetak dan diamankan di pangkalan data.</p>
                                     <a href={successData.file_url} target="_blank" rel="noopener noreferrer"
                                         className="inline-flex items-center gap-2 bg-slate-900 border border-slate-700 px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors"
                                     >
@@ -141,6 +141,24 @@ export default function DocumentGeneratorPage() {
 
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-sm shadow-2xl">
                             <form onSubmit={handleGenerateDocument} className="space-y-6">
+
+                                {/* DROPDOWN PEMILIHAN TEMPLATE */}
+                                <div className="relative">
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Jenis Naskah Dinas</label>
+                                    <div className="relative">
+                                        <select
+                                            value={templateType}
+                                            onChange={(e) => setTemplateType(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-slate-200 appearance-none cursor-pointer"
+                                        >
+                                            <option value="LHK">Laporan Hasil Kegiatan (LHK)</option>
+                                            <option value="SURAT_PERINTAH">Surat Perintah (Sprin)</option>
+                                            <option value="NOTA_DINAS">Nota Dinas</option>
+                                        </select>
+                                        <ChevronDown className="w-4 h-4 text-slate-500 absolute right-4 top-3.5 pointer-events-none" />
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Nomor Surat</label>
@@ -161,7 +179,6 @@ export default function DocumentGeneratorPage() {
                                 </div>
 
                                 <div>
-                                    {/* HEADER TEXTAREA DENGAN TOMBOL AI */}
                                     <div className="flex justify-between items-center mb-2">
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Isi Laporan / Narasi</label>
                                         <button
@@ -188,7 +205,6 @@ export default function DocumentGeneratorPage() {
                         </div>
                     </div>
 
-                    {/* KOLOM KANAN: AUDIT TRAIL */}
                     <div className="lg:col-span-1">
                         <div className="bg-slate-900 border border-slate-800 p-5 rounded-sm shadow-2xl h-full">
                             <div className="flex items-center gap-2 mb-6 border-b border-slate-800 pb-3">

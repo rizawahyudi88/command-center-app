@@ -19,9 +19,15 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { template_type, variables } = body;
 
-        // 2. Baca Template Master dari lokal penyimpanan server
-        const templateFileName = template_type === 'LHK' ? 'template_lhk.docx' : 'template_lhk.docx';
-        const templatePath = path.resolve(process.cwd(), 'templates', templateFileName);
+        // 2. Pemetaan Template Master secara Dinamis
+        const templateMap: Record<string, string> = {
+            'LHK': 'template_lhk.docx',
+            'SURAT_PERINTAH': 'template_sprin.docx',
+            'NOTA_DINAS': 'template_nodin.docx'
+        };
+
+        // Pilih file sesuai request, jika tidak ada, default ke LHK
+        const templateFileName = templateMap[template_type] || 'template_lhk.docx'; const templatePath = path.resolve(process.cwd(), 'templates', templateFileName);
 
         if (!fs.existsSync(templatePath)) {
             throw new Error(`File master template tidak ditemukan pada jalur: ${templatePath}`);
