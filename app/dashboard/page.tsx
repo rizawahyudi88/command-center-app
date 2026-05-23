@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Loader2, CheckCircle, ExternalLink, Clock, File, Sparkles, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { FileText, Loader2, CheckCircle, ExternalLink, Clock, File, Sparkles, ChevronDown, LogOut } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -9,13 +10,13 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function DocumentGeneratorPage() {
+    const router = useRouter();
+    const [checkingAuth, setCheckingAuth] = useState(true); // State validasi sesi
     const [loading, setLoading] = useState(false);
     const [generatingAI, setGeneratingAI] = useState(false);
     const [successData, setSuccessData] = useState<any>(null);
     const [history, setHistory] = useState<any[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
-
-    // STATE BARU: Menyimpan jenis naskah yang dipilih
     const [templateType, setTemplateType] = useState('LHK');
 
     const [formData, setFormData] = useState({
@@ -24,6 +25,20 @@ export default function DocumentGeneratorPage() {
         perihal: 'Laporan Situasi Operasional',
         isi_narasi: ''
     });
+
+    // PROTEKSI PERIMETER: Cek Sesi Pengguna
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                router.push('/login');
+            } else {
+                setCheckingAuth(false);
+                fetchHistory(); // Ambil riwayat hanya jika terotentikasi
+            }
+        };
+        checkSession();
+    }, [router]);
 
     const fetchHistory = async () => {
         setLoadingHistory(true);
@@ -38,9 +53,10 @@ export default function DocumentGeneratorPage() {
         setLoadingHistory(false);
     };
 
-    useEffect(() => {
-        fetchHistory();
-    }, []);
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push('/login');
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -61,7 +77,6 @@ export default function DocumentGeneratorPage() {
             });
 
             const result = await response.json();
-
             if (result.success) {
                 setFormData({ ...formData, isi_narasi: result.data.trim() });
             } else {
@@ -85,13 +100,12 @@ export default function DocumentGeneratorPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    template_type: templateType, // Menggunakan state dropdown
+                    template_type: templateType,
                     variables: formData
                 })
             });
 
             const result = await response.json();
-
             if (result.success) {
                 setSuccessData(result);
                 setFormData({ ...formData, isi_narasi: '' });
@@ -107,22 +121,42 @@ export default function DocumentGeneratorPage() {
         }
     };
 
+    // Tampilkan layar loading kosong selama memvalidasi token keamanan
+    if (checkingAuth) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-slate-950 text-slate-50 font-sans p-8">
             <div className="max-w-4xl mx-auto space-y-8">
 
+                {/* HEADER WITH LOGOUT */}
                 <div className="border-b border-slate-800 pb-4 flex justify-between items-end">
                     <div>
                         <h1 className="text-2xl font-bold tracking-wider">GENERATOR NASKAH DINAS</h1>
                         <p className="text-sm text-slate-400 mt-1">Sistem Otomatisasi Dokumen & Cloud Sinkronisasi</p>
                     </div>
-                    <div className="bg-blue-900/30 text-blue-400 border border-blue-800/50 px-3 py-1 text-[10px] uppercase tracking-widest font-bold rounded-sm flex items-center gap-2">
-                        <Sparkles className="w-3 h-3" /> AI Powered
+                    <div className="flex items-center gap-3">
+                        <div className="bg-blue-900/30 text-blue-400 border border-blue-800/50 px-3 py-1 text-[10px] uppercase tracking-widest font-bold rounded-sm flex items-center gap-2">
+                            <Sparkles className="w-3 h-3" /> AI Powered
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="text-slate-500 hover:text-red-400 p-1.5 transition-colors"
+                            title="Keluar Sistem"
+                        >
+                            <LogOut className="w-5 h-5" />
+                        </button>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
+                    {/* FORM GENERATOR */}
                     <div className="lg:col-span-2 space-y-6">
                         {successData && (
                             <div className="p-5 border border-emerald-500 bg-emerald-900/20 rounded-sm flex items-start gap-4">
@@ -142,7 +176,6 @@ export default function DocumentGeneratorPage() {
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-sm shadow-2xl">
                             <form onSubmit={handleGenerateDocument} className="space-y-6">
 
-                                {/* DROPDOWN PEMILIHAN TEMPLATE */}
                                 <div className="relative">
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Jenis Naskah Dinas</label>
                                     <div className="relative">
@@ -205,6 +238,7 @@ export default function DocumentGeneratorPage() {
                         </div>
                     </div>
 
+                    {/* AUDIT TRAIL */}
                     <div className="lg:col-span-1">
                         <div className="bg-slate-900 border border-slate-800 p-5 rounded-sm shadow-2xl h-full">
                             <div className="flex items-center gap-2 mb-6 border-b border-slate-800 pb-3">
