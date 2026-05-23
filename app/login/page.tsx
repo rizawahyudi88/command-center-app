@@ -33,6 +33,9 @@ export default function LoginPage() {
                     : error.message
                 );
             } else if (data?.session) {
+
+                // --- TAMBAHKAN BARIS INI UNTUK MIDDLEWARE ---
+                document.cookie = "cc_session=active; path=/; max-age=86400; secure; samesite=strict";
                 // Login sukses, arahkan langsung ke cockpit dashboard
                 router.push('/dashboard');
                 router.refresh();
