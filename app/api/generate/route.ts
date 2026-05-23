@@ -24,7 +24,7 @@ const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
 export async function POST(request: Request) {
     try {
-        const { template_type, variables } = await request.json();
+        const { template_type, variables, user_id } = await request.json();
 
         // 1. Pemetaan File Template Master
         const templateMap: Record<string, string> = {
@@ -102,7 +102,8 @@ export async function POST(request: Request) {
                     title: `${titleWithoutExt}.pdf`,
                     jenis_naskah: template_type,
                     file_url: finalPdfUrl,
-                    status: 'draft'
+                    status: 'WAITING_APPROVAL', // Ubah status menjadi menunggu persetujuan
+                    user_id: user_id // Rekam ID pembuat dokumen
                 }
             ]);
 

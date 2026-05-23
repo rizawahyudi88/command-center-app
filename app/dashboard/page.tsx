@@ -133,7 +133,8 @@ export default function DocumentGeneratorPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     template_type: templateType,
-                    variables: formData
+                    variables: formData,
+                    user_id: profile.id // <-- TAMBAHKAN BARIS INI
                 })
             });
             const result = await response.json();
