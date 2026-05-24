@@ -149,7 +149,7 @@ export default function DocumentGeneratorPage() {
             const response = await fetch('/api/ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: formData.isi_narasi })
+                body: JSON.stringify({ prompt: formData.isi_narasi, template_type: templateType })
             });
             const result = await response.json();
             if (result.success) {
@@ -296,11 +296,12 @@ export default function DocumentGeneratorPage() {
                                 <div className="relative">
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Jenis Naskah Dinas</label>
                                     <div className="relative">
-                                        <select value={templateType} onChange={(e) => setTemplateType(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-slate-200 appearance-none cursor-pointer">
-                                            <option value="LHK">Laporan Hasil Kegiatan (LHK)</option>
-                                            <option value="SURAT_PERINTAH">Surat Perintah (Sprin)</option>
-                                            <option value="NOTA_DINAS">Nota Dinas</option>
-                                        </select>
+                                    <select value={templateType} onChange={(e) => setTemplateType(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-sm px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-slate-200 appearance-none cursor-pointer">
+    <option value="LHK">Laporan Hasil Kegiatan (LHK)</option>
+    <option value="SURAT_PERINTAH">Surat Perintah (Sprin)</option>
+    <option value="NOTA_DINAS">Nota Dinas</option>
+    <option value="SURAT_TELEGRAM">Surat Telegram (ST)</option> {/* Tambahkan baris ini */}
+  </select>
                                         <ChevronDown className="w-4 h-4 text-slate-500 absolute right-4 top-3.5 pointer-events-none" />
                                     </div>
                                 </div>

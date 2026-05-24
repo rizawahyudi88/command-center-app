@@ -1,49 +1,48 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Inisialisasi Model Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+// Menggunakan Gemini API Key dari .env.local
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(request: Request) {
-    try {
-        const { prompt } = await request.json();
+  try {
+    const { prompt, template_type } = await request.json();
 
-        if (!prompt) {
-            return NextResponse.json({ success: false, error: 'Instruksi tidak boleh kosong.' }, { status: 400 });
-        }
-
-        // Memilih model: gemini-1.5-flash sangat cepat dan cocok untuk tugas teks
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-
-        // SYSTEM INSTRUCTION: Membentuk Persona AI Agent sebagai Asisten Naskah Dinas
-        const systemPrompt = `
-      Anda adalah AI Asisten spesialis penyusun Naskah Dinas Polri tingkat lanjut.
-      Tugas Anda adalah mengubah poin-poin informasi mentah/singkat yang diberikan pengguna menjadi sebuah paragraf narasi laporan formal yang siap dimasukkan ke dalam dokumen dinas.
-      
-      Aturan Mutlak:
-      1. Gunakan bahasa Indonesia baku yang sangat formal, tegas, dan profesional sesuai standar Ejaan Yang Disempurnakan (EYD).
-      2. Gunakan terminologi operasional standar kepolisian yang tepat (misal: "giat" untuk kegiatan, "sitkamtibmas", "personel", "kondusif").
-      3. Jangan menambahkan informasi fiktif yang tidak ada di poin mentah, cukup elaborasi dan perbaiki struktur kalimatnya.
-      4. Output HANYA berupa teks laporan akhir (tanpa basa-basi, tanpa ucapan pembuka/penutup seperti "Berikut adalah laporannya:").
-      
-      Poin Mentah dari Pengguna:
-      ${prompt}
-    `;
-
-        // Eksekusi prompt ke server Google Gemini
-        const result = await model.generateContent(systemPrompt);
-        const responseText = result.response.text();
-
-        return NextResponse.json({
-            success: true,
-            data: responseText
-        });
-
-    } catch (error: any) {
-        console.error('Gemini API Error:', error);
-        return NextResponse.json({
-            success: false,
-            error: error.message || 'Gagal terhubung ke server AI.'
-        }, { status: 500 });
+    if (!prompt) {
+      return NextResponse.json({ success: false, error: 'Prompt kosong' }, { status: 400 });
     }
+
+    // Menggunakan model efisien yang sudah kita bahas sebelumnya
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+
+    let systemInstruction = "";
+
+    // LOGIKA KONDISIONAL SANDI TELEGRAM
+    if (template_type === 'SURAT_TELEGRAM') {
+      systemInstruction = `Anda adalah asisten AI khusus pembuat draf Surat Telegram (ST) Polri.
+      Ubah narasi mentah dari pengguna menjadi bahasa telegram yang kaku, padat, dan jelas dengan mematuhi ATURAN MUTLAK berikut:
+      1. WAJIB GUNAKAN HURUF KAPITAL SEMUA (ALL CAPS).
+      2. Dilarang keras menggunakan simbol tanda baca (, . / -). Ganti dengan sandi huruf:
+         - Titik (.) diganti menjadi TTK
+         - Koma (,) diganti menjadi KMA
+         - Titik dua (:) diganti menjadi TTK DUA
+         - Garis miring (/) diganti menjadi GRS MRG
+         - Tanda hubung (-) diganti menjadi TND HBNG
+      3. Gunakan singkatan dinas baku: TGL (Tanggal), YBS (Yang Bersangkutan), TPT (Tempat), JML (Jumlah), KET (Keterangan), GUNA (Untuk digunakan), SBB (Sebagai berikut).
+      4. Jangan tambahkan kata pengantar atau penutup. Langsung berikan hasil teksnya saja.`;
+    } else {
+      systemInstruction = `Anda adalah asisten staf administrasi ahli. Rapihkan poin-poin mentah dari pengguna menjadi paragraf laporan dinas (Nota Dinas/LHK) yang sangat formal, menggunakan bahasa Indonesia baku (EYD), profesional, dan ringkas. Jangan mengubah fakta, hanya perbaiki struktur bahasanya saja. Jangan gunakan format Markdown (* atau #), gunakan teks datar biasa.`;
+    }
+
+    const finalPrompt = `${systemInstruction}\n\nBerikut adalah narasi mentah yang harus diolah:\n"${prompt}"`;
+
+    const result = await model.generateContent(finalPrompt);
+    const responseText = result.response.text();
+
+    return NextResponse.json({ success: true, data: responseText });
+
+  } catch (error: any) {
+    console.error('Gemini API Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
 }

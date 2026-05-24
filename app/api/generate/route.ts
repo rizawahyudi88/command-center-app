@@ -30,7 +30,8 @@ export async function POST(request: Request) {
         const templateMap: Record<string, string> = {
             'LHK': 'template_lhk.docx',
             'SURAT_PERINTAH': 'template_sprin.docx',
-            'NOTA_DINAS': 'template_nodin.docx'
+            'NOTA_DINAS': 'template_nodin.docx',
+            'SURAT_TELEGRAM': 'template_st.docx'
         };
         const templateFileName = templateMap[template_type] || 'template_lhk.docx';
         const templatePath = path.join(process.cwd(), 'templates', templateFileName);
